@@ -80,6 +80,38 @@ describe('GET /protected/profile without a token', () => {
   });
 });
 
+describe('GET /protected/profile with a token', () => {
+  let token;
+
+  beforeEach(async () => {
+    await signup();
+    const res = await login();
+    token = res.body.access_token;
+  });
+
+  it('returns 200 with the user safe metadata for a valid token', async () => {
+    const res = await request(app).get('/protected/profile').set('Authorization', `Bearer ${token}`);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.email, EMAIL);
+    assert.ok(res.body.id);
+    assert.ok(res.body.created_at);
+    assert.deepEqual(Object.keys(res.body).sort(), ['created_at', 'email', 'id']);
+  });
+
+  it('returns 401 for a tampered token', async () => {
+    const tampered = token.slice(0, -1) + (token.endsWith('a') ? 'b' : 'a');
+    const res = await request(app).get('/protected/profile').set('Authorization', `Bearer ${tampered}`);
+    assert.equal(res.status, 401);
+    assert.deepEqual(res.body, { error: 'Invalid or expired token' });
+  });
+
+  it('returns 401 for a made-up token', async () => {
+    const res = await request(app).get('/protected/profile').set('Authorization', 'Bearer not-a-real-jwt');
+    assert.equal(res.status, 401);
+    assert.deepEqual(res.body, { error: 'Invalid or expired token' });
+  });
+});
+
 describe('POST /auth/login', () => {
   beforeEach(async () => {
     await signup();

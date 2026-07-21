@@ -9,7 +9,7 @@ function createApp(supabase) {
 
   app.use('/auth', createAuthRouter(supabase));
   app.use('/public', publicRouter);
-  app.use('/protected', createProtectedRouter());
+  app.use('/protected', createProtectedRouter(supabase));
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });
