@@ -17,6 +17,16 @@ function createProtectedRouter(requireAuth) {
     });
   });
 
+  router.get('/admin', requireAuth, (req, res) => {
+    const role = (req.user.app_metadata && req.user.app_metadata.role) || null;
+    if (role !== 'admin') {
+      return res.status(403).json({ error: 'Admin role required' });
+    }
+    res.status(200).json({
+      message: `Welcome, admin ${req.user.email}. The control room is yours.`,
+    });
+  });
+
   return router;
 }
 

@@ -6,13 +6,13 @@ const { publicRouter } = require('./routes/public');
 const { createProtectedRouter } = require('./routes/protected');
 const { createRequireAuth } = require('./middleware/requireAuth');
 
-function createApp(supabase) {
+function createApp(supabase, options = {}) {
   const app = express();
   app.use(express.json());
 
   const requireAuth = createRequireAuth(supabase);
 
-  app.use('/auth', createAuthRouter(supabase, requireAuth));
+  app.use('/auth', createAuthRouter(supabase, requireAuth, options));
   app.use('/public', publicRouter);
   app.use('/protected', createProtectedRouter(requireAuth));
 

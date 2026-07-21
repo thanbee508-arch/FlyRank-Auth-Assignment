@@ -169,6 +169,107 @@ describe('POST /auth/logout', () => {
   });
 });
 
+describe('GET /protected/admin (401 vs 403)', () => {
+  let token;
+
+  beforeEach(async () => {
+    await signup();
+    const res = await login();
+    token = res.body.access_token;
+  });
+
+  it('returns 403 for an authenticated non-admin', async () => {
+    const res = await request(app).get('/protected/admin').set('Authorization', `Bearer ${token}`);
+    assert.equal(res.status, 403);
+    assert.deepEqual(res.body, { error: 'Admin role required' });
+  });
+
+  it('returns 200 for an admin', async () => {
+    supabase.state.usersByEmail.get(EMAIL).user.app_metadata.role = 'admin';
+    const res = await request(app).get('/protected/admin').set('Authorization', `Bearer ${token}`);
+    assert.equal(res.status, 200);
+    assert.match(res.body.message, /admin/);
+  });
+
+  it('returns 401 for a missing token', async () => {
+    const res = await request(app).get('/protected/admin');
+    assert.equal(res.status, 401);
+    assert.deepEqual(res.body, { error: 'Access token required' });
+  });
+});
+
+describe('POST /auth/refresh', () => {
+  let refreshToken;
+
+  beforeEach(async () => {
+    await signup();
+    const res = await login();
+    refreshToken = res.body.refresh_token;
+  });
+
+  it('exchanges a refresh token for a new access token', async () => {
+    const res = await request(app).post('/auth/refresh').send({ refresh_token: refreshToken });
+    assert.equal(res.status, 200);
+    assert.equal(typeof res.body.access_token, 'string');
+    assert.equal(typeof res.body.refresh_token, 'string');
+    const profile = await request(app)
+      .get('/protected/profile')
+      .set('Authorization', `Bearer ${res.body.access_token}`);
+    assert.equal(profile.status, 200);
+  });
+
+  it('returns 400 when the refresh token is missing', async () => {
+    const res = await request(app).post('/auth/refresh').send({});
+    assert.equal(res.status, 400);
+    assert.equal(typeof res.body.error, 'string');
+  });
+
+  it('returns 401 for an invalid refresh token', async () => {
+    const res = await request(app).post('/auth/refresh').send({ refresh_token: 'bogus' });
+    assert.equal(res.status, 401);
+    assert.equal(typeof res.body.error, 'string');
+  });
+});
+
+describe('login rate limiting', () => {
+  beforeEach(async () => {
+    app = createApp(supabase, { loginMaxAttempts: 3, loginWindowMs: 60000 });
+    await signup();
+  });
+
+  it('returns 429 after too many failed attempts, even with the right password', async () => {
+    for (let i = 0; i < 3; i += 1) {
+      const res = await login({ email: EMAIL, password: 'wrong-password' });
+      assert.equal(res.status, 401);
+    }
+    const blocked = await login();
+    assert.equal(blocked.status, 429);
+    assert.deepEqual(blocked.body, { error: 'Too many failed login attempts. Try again later.' });
+  });
+
+  it('does not rate limit a different account', async () => {
+    for (let i = 0; i < 3; i += 1) {
+      await login({ email: EMAIL, password: 'wrong-password' });
+    }
+    await signup({ email: 'bob@example.com', password: PASSWORD });
+    const res = await login({ email: 'bob@example.com', password: PASSWORD });
+    assert.equal(res.status, 200);
+  });
+
+  it('clears the counter after a successful login', async () => {
+    for (let i = 0; i < 2; i += 1) {
+      await login({ email: EMAIL, password: 'wrong-password' });
+    }
+    const ok = await login();
+    assert.equal(ok.status, 200);
+    for (let i = 0; i < 2; i += 1) {
+      await login({ email: EMAIL, password: 'wrong-password' });
+    }
+    const stillOk = await login();
+    assert.equal(stillOk.status, 200);
+  });
+});
+
 describe('Swagger UI', () => {
   it('serves the interactive docs at /docs', async () => {
     const res = await request(app).get('/docs/');

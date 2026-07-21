@@ -57,8 +57,10 @@ The server logs `Server running on http://localhost:3000` followed by `Connected
 | POST   | `/auth/signup`         | none                          | `201`   | `400` missing/invalid input                |
 | POST   | `/auth/login`          | none                          | `200`   | `400` missing input · `401` bad credentials |
 | POST   | `/auth/logout`         | `Authorization: Bearer <token>` | `204`   | `401` missing/invalid token                |
+| POST   | `/auth/refresh`        | none (needs `refresh_token` in body) | `200`   | `400` missing token · `401` invalid token  |
 | GET    | `/protected/profile`   | `Authorization: Bearer <token>` | `200`   | `401` missing/invalid token                |
 | GET    | `/protected/dashboard` | `Authorization: Bearer <token>` | `200`   | `401` missing/invalid token                |
+| GET    | `/protected/admin`     | `Authorization: Bearer <token>` + admin role | `200`   | `401` not logged in · `403` not an admin   |
 | GET    | `/public/info`         | none                          | `200`   | —                                          |
 
 Every error is JSON: `{ "error": "<message>" }`.
@@ -106,12 +108,39 @@ src/
   app.js                  wires routes, middleware, Swagger UI
   supabase.js             creates the Supabase client from .env
   middleware/requireAuth.js   the one reusable guard: extracts + verifies bearer tokens
-  routes/auth.js          signup, login, logout
-  routes/protected.js     profile + dashboard (both behind requireAuth)
+  routes/auth.js          signup, login, logout, refresh (+ login rate limiting)
+  routes/protected.js     profile, dashboard, admin (all behind requireAuth)
   routes/public.js        open endpoint
 openapi.json              OpenAPI 3 spec with the bearerAuth security scheme
 tests/                    node:test + supertest suite with a faked Supabase client
 ```
+
+## Extras
+
+### 401 vs 403 — the difference is authorization
+
+- **`401` means "I don't know you"** — the token is missing, malformed, or fails Supabase verification. Authentication failed.
+- **`403` means "I know you, and no"** — the token verified fine, but the account lacks the required role. Authorization failed.
+
+`GET /protected/admin` demonstrates this: any logged-in user gets `403` unless their `app_metadata.role` is `admin`. Roles live in `app_metadata` because users cannot edit it themselves (unlike `user_metadata`). To promote a user, run this in the Supabase SQL editor:
+
+```sql
+update auth.users
+set raw_app_meta_data = raw_app_meta_data || '{"role": "admin"}'
+where email = 'test@example.com';
+```
+
+### Refresh flow
+
+`POST /auth/refresh` exchanges the `refresh_token` from login for a fresh token pair. Access tokens are deliberately short-lived (one hour by default) so a stolen token has a small blast radius — the refresh token is what keeps users logged in without re-entering credentials.
+
+### Login rate limiting
+
+After 5 failed attempts for the same account+IP within 15 minutes, `POST /auth/login` answers `429` — even for the correct password — until the window expires. Brute-force protection lives at the login door because that is the only endpoint where an attacker can test guesses; a successful login resets the counter. Tune with `LOGIN_MAX_ATTEMPTS` and `LOGIN_WINDOW_MS` in `.env`.
+
+### Stateless logout
+
+`POST /auth/logout` asks Supabase to end the session, but a JWT already issued stays cryptographically valid until it expires — that is the trade-off of stateless tokens, and exactly why they are short-lived and paired with refresh tokens.
 
 ## Security notes
 
