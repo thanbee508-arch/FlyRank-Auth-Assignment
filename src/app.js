@@ -2,14 +2,17 @@ const express = require('express');
 const { createAuthRouter } = require('./routes/auth');
 const { publicRouter } = require('./routes/public');
 const { createProtectedRouter } = require('./routes/protected');
+const { createRequireAuth } = require('./middleware/requireAuth');
 
 function createApp(supabase) {
   const app = express();
   app.use(express.json());
 
-  app.use('/auth', createAuthRouter(supabase));
+  const requireAuth = createRequireAuth(supabase);
+
+  app.use('/auth', createAuthRouter(supabase, requireAuth));
   app.use('/public', publicRouter);
-  app.use('/protected', createProtectedRouter(supabase));
+  app.use('/protected', createProtectedRouter(requireAuth));
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });

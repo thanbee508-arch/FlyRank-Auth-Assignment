@@ -1,6 +1,6 @@
 const express = require('express');
 
-function createAuthRouter(supabase) {
+function createAuthRouter(supabase, requireAuth) {
   const router = express.Router();
 
   router.post('/signup', async (req, res, next) => {
@@ -14,6 +14,18 @@ function createAuthRouter(supabase) {
         return res.status(error.status || 400).json({ error: error.message });
       }
       return res.status(201).json({ user: data.user });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/logout', requireAuth, async (req, res, next) => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error && error.name !== 'AuthSessionMissingError') {
+        return res.status(error.status || 500).json({ error: error.message });
+      }
+      return res.status(204).send();
     } catch (err) {
       next(err);
     }

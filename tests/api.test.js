@@ -112,6 +112,63 @@ describe('GET /protected/profile with a token', () => {
   });
 });
 
+describe('GET /protected/dashboard (same middleware, zero new auth code)', () => {
+  let token;
+
+  beforeEach(async () => {
+    await signup();
+    const res = await login();
+    token = res.body.access_token;
+  });
+
+  it('permits a valid token with 200', async () => {
+    const res = await request(app).get('/protected/dashboard').set('Authorization', `Bearer ${token}`);
+    assert.equal(res.status, 200);
+    assert.match(res.body.message, new RegExp(EMAIL));
+  });
+
+  it('rejects a bad token with 401', async () => {
+    const res = await request(app).get('/protected/dashboard').set('Authorization', 'Bearer bogus');
+    assert.equal(res.status, 401);
+    assert.deepEqual(res.body, { error: 'Invalid or expired token' });
+  });
+
+  it('rejects a missing token with 401', async () => {
+    const res = await request(app).get('/protected/dashboard');
+    assert.equal(res.status, 401);
+    assert.deepEqual(res.body, { error: 'Access token required' });
+  });
+});
+
+describe('POST /auth/logout', () => {
+  let token;
+
+  beforeEach(async () => {
+    await signup();
+    const res = await login();
+    token = res.body.access_token;
+  });
+
+  it('returns 204 and calls Supabase signOut for a valid token', async () => {
+    const res = await request(app).post('/auth/logout').set('Authorization', `Bearer ${token}`);
+    assert.equal(res.status, 204);
+    assert.deepEqual(res.body, {});
+    assert.equal(supabase.state.signOutCalls, 1);
+  });
+
+  it('returns 401 without a token', async () => {
+    const res = await request(app).post('/auth/logout');
+    assert.equal(res.status, 401);
+    assert.deepEqual(res.body, { error: 'Access token required' });
+  });
+
+  it('returns 401 with an invalid token', async () => {
+    const res = await request(app).post('/auth/logout').set('Authorization', 'Bearer bogus');
+    assert.equal(res.status, 401);
+    assert.deepEqual(res.body, { error: 'Invalid or expired token' });
+  });
+});
+
 describe('POST /auth/login', () => {
   beforeEach(async () => {
     await signup();
