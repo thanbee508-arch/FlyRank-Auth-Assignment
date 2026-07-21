@@ -52,6 +52,34 @@ describe('POST /auth/signup', () => {
   });
 });
 
+describe('GET /public/info', () => {
+  it('is open to everyone', async () => {
+    const res = await request(app).get('/public/info');
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body, { message: 'Welcome stranger! This info is public.' });
+  });
+});
+
+describe('GET /protected/profile without a token', () => {
+  it('returns 401 when the Authorization header is missing', async () => {
+    const res = await request(app).get('/protected/profile');
+    assert.equal(res.status, 401);
+    assert.deepEqual(res.body, { error: 'Access token required' });
+  });
+
+  it('returns 401 when the Authorization header is malformed', async () => {
+    const res = await request(app).get('/protected/profile').set('Authorization', 'some-raw-token');
+    assert.equal(res.status, 401);
+    assert.deepEqual(res.body, { error: 'Access token required' });
+  });
+
+  it('returns 401 when the Bearer scheme has no token', async () => {
+    const res = await request(app).get('/protected/profile').set('Authorization', 'Bearer');
+    assert.equal(res.status, 401);
+    assert.deepEqual(res.body, { error: 'Access token required' });
+  });
+});
+
 describe('POST /auth/login', () => {
   beforeEach(async () => {
     await signup();
