@@ -1,4 +1,6 @@
 const express = require('express');
+const swaggerUi = require('swagger-ui-express');
+const openapiSpec = require('../openapi.json');
 const { createAuthRouter } = require('./routes/auth');
 const { publicRouter } = require('./routes/public');
 const { createProtectedRouter } = require('./routes/protected');
@@ -13,6 +15,11 @@ function createApp(supabase) {
   app.use('/auth', createAuthRouter(supabase, requireAuth));
   app.use('/public', publicRouter);
   app.use('/protected', createProtectedRouter(requireAuth));
+
+  app.get('/openapi.json', (req, res) => {
+    res.status(200).json(openapiSpec);
+  });
+  app.use('/docs', swaggerUi.serve, swaggerUi.setup(openapiSpec));
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });

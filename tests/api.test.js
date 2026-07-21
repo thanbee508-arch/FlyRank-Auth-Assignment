@@ -169,6 +169,26 @@ describe('POST /auth/logout', () => {
   });
 });
 
+describe('Swagger UI', () => {
+  it('serves the interactive docs at /docs', async () => {
+    const res = await request(app).get('/docs/');
+    assert.equal(res.status, 200);
+    assert.match(res.text, /swagger-ui/);
+  });
+
+  it('publishes an OpenAPI spec with a bearer security scheme on protected routes', async () => {
+    const res = await request(app).get('/openapi.json');
+    assert.equal(res.status, 200);
+    const scheme = res.body.components.securitySchemes.bearerAuth;
+    assert.equal(scheme.type, 'http');
+    assert.equal(scheme.scheme, 'bearer');
+    assert.equal(scheme.bearerFormat, 'JWT');
+    assert.deepEqual(res.body.paths['/protected/profile'].get.security, [{ bearerAuth: [] }]);
+    assert.deepEqual(res.body.paths['/protected/dashboard'].get.security, [{ bearerAuth: [] }]);
+    assert.deepEqual(res.body.paths['/auth/logout'].post.security, [{ bearerAuth: [] }]);
+  });
+});
+
 describe('POST /auth/login', () => {
   beforeEach(async () => {
     await signup();
