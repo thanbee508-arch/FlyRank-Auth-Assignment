@@ -1,7 +1,7 @@
 require('dotenv').config({ quiet: true });
 
-const express = require('express');
 const { createSupabaseClient } = require('./supabase');
+const { createApp } = require('./app');
 
 const PORT = Number.parseInt(process.env.PORT || '3000', 10);
 
@@ -15,8 +15,7 @@ async function checkSupabaseConnection() {
 }
 
 const supabase = createSupabaseClient();
-const app = express();
-app.use(express.json());
+const app = createApp(supabase);
 
 app.listen(PORT, async () => {
   console.log(`Server running on http://localhost:${PORT}`);
