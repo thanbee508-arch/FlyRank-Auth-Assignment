@@ -98,7 +98,10 @@ Expected: `201` → `200` with tokens → `200` public → `200` profile → `40
 npm test
 ```
 
-Integration tests cover every endpoint and status code (400/401 validation, tampered tokens, middleware reuse, Swagger's bearer scheme) using a faked Supabase client, so they run offline and never touch your real project.
+The suite runs fully offline and never touches a real Supabase project:
+
+- `tests/api.test.js` covers every endpoint and status code (400/401/403/429 validation, tampered tokens, middleware reuse, Swagger's bearer scheme) against a faked Supabase client.
+- `tests/sdk.integration.test.js` goes further: it runs the **real `@supabase/supabase-js` SDK** against an emulated Supabase Auth server (`tests/emulatedSupabase.js`) speaking the GoTrue wire format over real HTTP, proving the routes handle the SDK's actual request/response shapes — no API key required.
 
 ## Project structure
 
